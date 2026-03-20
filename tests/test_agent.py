@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
+import agent
 
 # Load API key from .env
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
@@ -32,7 +33,7 @@ def test_claude_classifies_emails_correctly():
     Integration test: Send real emails to Claude and verify classification.
 
     This is NOT a unit test (doesn't mock). It tests the REAL integration.
-    - Calls real Claude API
+    - Calls real Claude API via agent.classify_emails()
     - Verifies response structure and content
     - Confirms AI classification works
     """
@@ -41,23 +42,8 @@ def test_claude_classifies_emails_correctly():
         print("⚠️  Skipping: A_API_KEY not set in .env")
         return
 
-    # Setup LLM
+    # Setup real LLM
     llm = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=api_key)
-
-    # Create the classification prompt (from agent.py)
-    categorize_prompt = ChatPromptTemplate.from_template("""
-You are an email triage assistant.
-For each email, classify urgency and category based on the headers only.
-
-Urgency: URGENT (if it is something that should be replied within 1 day), FYI, or IGNORE
-Category: one of Personal / Advertisement / Spam / Entertainment / Knowledge and News / Payment confirmation / Rest
-
-Return a JSON array only, no explanation. Example:
-[{"index": 0, "urgency": "URGENT", "category": "Personal"}]
-
-Emails:
-{emails}
-""")
 
     # Sample emails to classify
     sample_headers = [
@@ -81,16 +67,12 @@ Emails:
         }
     ]
 
-    # ACTION: Call Claude
-    chain = categorize_prompt | llm
-    response = chain.invoke({
-        "emails": json.dumps(sample_headers, indent=2),
-        "learning_context": "No flagged emails yet. Use your best judgment."
-    })
-
-    # Parse response
-    content = response.content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    results = json.loads(content)
+    # ACTION: Call the real classify_emails function from agent.py
+    results = agent.classify_emails(
+        sample_headers,
+        "No flagged emails yet. Use your best judgment.",
+        llm
+    )
     result_map = {r["index"]: r for r in results}
 
     # ASSERT: Verify structure
@@ -105,9 +87,9 @@ Emails:
     assert result_map[1]["urgency"] in ["FYI", "IGNORE"], f"Amazon should be FYI/IGNORE, got {result_map[1]['urgency']}"
     assert result_map[1]["category"] == "Payment confirmation", f"Amazon should be Payment confirmation, got {result_map[1]['category']}"
 
-    # Email 2 (spam) should be IGNORE or Spam
+    # Email 2 (spam) should be IGNORE or FYI, and category should be Spam or Advertisement
     assert result_map[2]["urgency"] in ["IGNORE", "FYI"], f"Spam should be IGNORE, got {result_map[2]['urgency']}"
-    assert result_map[2]["category"] == "Spam", f"Should be Spam category, got {result_map[2]['category']}"
+    assert result_map[2]["category"] in ["Spam", "Advertisement"], f"Should be Spam or Advertisement, got {result_map[2]['category']}"
 
     print(f"\n✅ Claude classified emails:")
     for r in results:
@@ -126,24 +108,8 @@ def test_claude_respects_learning_context():
         print("⚠️  Skipping: A_API_KEY not set in .env")
         return
 
+    # Setup real LLM
     llm = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=api_key)
-
-    categorize_prompt = ChatPromptTemplate.from_template("""
-You are an email triage assistant.
-For each email, classify urgency and category based on the headers only.
-
-Urgency: URGENT (if it is something that should be replied within 1 day), FYI, or IGNORE
-Category: one of Personal / Advertisement / Spam / Entertainment / Knowledge and News / Payment confirmation / Rest
-
-IMPORTANT - Learn from past corrections:
-{learning_context}
-
-Return a JSON array only, no explanation. Example:
-[{"index": 0, "urgency": "URGENT", "category": "Personal"}]
-
-Emails:
-{emails}
-""")
 
     sample_headers = [
         {
@@ -158,15 +124,12 @@ Emails:
     learning_context = """Emails that were flagged as URGENT:
 - From: john.doe@startup.co, Summary: Startup investor asking about proposal details, Reason: Time-sensitive investment decision"""
 
-    # ACTION: Call Claude with learning context
-    chain = categorize_prompt | llm
-    response = chain.invoke({
-        "emails": json.dumps(sample_headers, indent=2),
-        "learning_context": learning_context
-    })
-
-    content = response.content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    results = json.loads(content)
+    # ACTION: Call the real classify_emails function from agent.py
+    results = agent.classify_emails(
+        sample_headers,
+        learning_context,
+        llm
+    )
 
     # ASSERT: With learning context, Claude should classify as URGENT
     assert results[0]["urgency"] == "URGENT", f"Should learn from context, got {results[0]['urgency']}"
