@@ -24,6 +24,10 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 api_key = os.getenv("A_API_KEY")
 
+# If no API key, mock the LLM so api.py can import without crashing
+if not api_key:
+    sys.modules['langchain_anthropic'] = MagicMock()
+
 import db
 from fastapi.testclient import TestClient
 from api import app
