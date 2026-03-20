@@ -14,9 +14,15 @@ import json
 import tempfile
 from pathlib import Path
 import sys
+import os
+import pytest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+api_key = os.getenv("A_API_KEY")
 
 import db
 from fastapi.testclient import TestClient
@@ -203,6 +209,7 @@ def test_get_emails_by_category():
             assert spam[0]["urgency"] == "IGNORE"
 
 
+@pytest.mark.skipif(not api_key, reason="Requires A_API_KEY in .env")
 def test_get_email_summary_with_mock():
     """
     Test GET /emails/{index}/summary generates summary.
