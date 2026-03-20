@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 api_key = os.getenv("A_API_KEY")
 
-llm = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=api_key)
-
 categorize_prompt = ChatPromptTemplate.from_template("""
 You are an email triage assistant.
 For each email, classify urgency and category based on the headers only.
@@ -48,45 +46,67 @@ Emails:
 {emails}
 """)
 
-chain = categorize_prompt | llm
+def classify_emails(emails_headers, learning_context, llm):
+    """
+    Classify emails using the provided LLM.
 
-emails_path = Path(__file__).parent.parent / "emails" / "emails.json"
+    Args:
+        emails_headers: List of email dicts with index, from, date, subject
+        learning_context: String with learning examples or "No flagged emails yet..."
+        llm: ChatAnthropic instance
 
-if not emails_path.exists():
-    raise SystemExit("emails/emails.json not found. Run fetch_gmail.py first.")
+    Returns:
+        List of dicts with index, urgency, category
+    """
+    chain = categorize_prompt | llm
+    response = chain.invoke({
+        "emails": json.dumps(emails_headers, indent=2),
+        "learning_context": learning_context
+    })
 
-emails = json.loads(emails_path.read_text(encoding="utf-8"))
+    logger.info(f"Tokens used — input: {response.usage_metadata['input_tokens']}, output: {response.usage_metadata['output_tokens']}, total: {response.usage_metadata['total_tokens']}")
 
-# Send only headers to the LLM
-headers = [{"index": e["index"], "from": e["from"], "date": e["date"], "subject": e["subject"]} for e in emails]
+    # Strip markdown code blocks if present and parse
+    content = response.content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    results = json.loads(content)
+    return results
 
-# Get learning context from flagged emails
-flagged = db.get_urgent_flagged()
-if flagged:
-    learning_context = "Emails that were flagged as URGENT:\n" + "\n".join([
-        f"- From: {f['sender']}, Summary: {f['summary']}" + (f", Reason: {f['reason']}" if f.get('reason') else "")
-        for f in flagged
-    ])
-else:
-    learning_context = "No flagged emails yet. Use your best judgment."
 
-logger.info(f"Triaging {len(emails)} emails... (with {len(flagged)} learning examples)")
-response = chain.invoke({
-    "emails": json.dumps(headers, indent=2),
-    "learning_context": learning_context
-})
+if __name__ == "__main__":
+    emails_path = Path(__file__).parent.parent / "emails" / "emails.json"
 
-logger.info(f"Tokens used — input: {response.usage_metadata['input_tokens']}, output: {response.usage_metadata['output_tokens']}, total: {response.usage_metadata['total_tokens']}")
+    if not emails_path.exists():
+        raise SystemExit("emails/emails.json not found. Run fetch_gmail.py first.")
 
-# Strip markdown code blocks if present and parse
-content = response.content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-results = json.loads(content)
-result_map = {r["index"]: r for r in results}
+    emails = json.loads(emails_path.read_text(encoding="utf-8"))
 
-for e in emails:
-    result = result_map.get(e["index"], {})
-    e["urgency"] = result.get("urgency", "")
-    e["category"] = result.get("category", "")
+    # Send only headers to the LLM
+    headers = [{"index": e["index"], "from": e["from"], "date": e["date"], "subject": e["subject"]} for e in emails]
 
-emails_path.write_text(json.dumps(emails, ensure_ascii=False, indent=2), encoding="utf-8")
-logger.info("Done. Urgency and category updated in emails/emails.json")
+    # Get learning context from flagged emails
+    flagged = db.get_urgent_flagged()
+    if flagged:
+        learning_context = "Emails that were flagged as URGENT:\n" + "\n".join([
+            f"- From: {f['sender']}, Summary: {f['summary']}" + (f", Reason: {f['reason']}" if f.get('reason') else "")
+            for f in flagged
+        ])
+    else:
+        learning_context = "No flagged emails yet. Use your best judgment."
+
+    logger.info(f"Triaging {len(emails)} emails... (with {len(flagged)} learning examples)")
+
+    # Create the LLM instance
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=api_key)
+
+    # Classify emails
+    results = classify_emails(headers, learning_context, llm)
+    result_map = {r["index"]: r for r in results}
+
+    # Update emails with classification
+    for e in emails:
+        result = result_map.get(e["index"], {})
+        e["urgency"] = result.get("urgency", "")
+        e["category"] = result.get("category", "")
+
+    emails_path.write_text(json.dumps(emails, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info("Done. Urgency and category updated in emails/emails.json")
