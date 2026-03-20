@@ -19,28 +19,11 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import db
-from fastapi.testclient import FastAPI
+from fastapi.testclient import TestClient
 from api import app
 
 # Create test client
 client = TestClient(app)
-
-
-class TestClient:
-    """Simple test client for FastAPI."""
-
-    def __init__(self, app):
-        from fastapi.testclient import TestClient as FC
-        self.client = FC(app)
-
-    def get(self, path):
-        return self.client.get(path)
-
-    def post(self, path, json=None):
-        return self.client.post(path, json=json)
-
-    def delete(self, path):
-        return self.client.delete(path)
 
 
 def setup_test_db(tmpdir):
