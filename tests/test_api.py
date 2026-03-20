@@ -229,7 +229,7 @@ def test_get_email_summary_with_mock():
             mock_llm_response = MagicMock()
             mock_llm_response.content = "This is a test summary of the quarterly review email."
 
-            with patch('api.chain.invoke', return_value=mock_llm_response):
+            with patch('api.llm.invoke', return_value=mock_llm_response):
                 # ACTION: Request summary
                 response = client.get("/emails/0/summary")
 

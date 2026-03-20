@@ -84,7 +84,8 @@ Emails:
     # ACTION: Call Claude
     chain = categorize_prompt | llm
     response = chain.invoke({
-        "emails": json.dumps(sample_headers, indent=2)
+        "emails": json.dumps(sample_headers, indent=2),
+        "learning_context": "No flagged emails yet. Use your best judgment."
     })
 
     # Parse response
