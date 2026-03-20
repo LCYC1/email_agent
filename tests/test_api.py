@@ -218,7 +218,7 @@ def test_get_email_summary_with_mock():
     """
     Test GET /emails/{index}/summary generates summary.
 
-    Note: We mock the LLM response to avoid API calls in tests.
+    Note: We mock the chain (prompt | llm) to avoid API calls in tests.
     """
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -229,7 +229,12 @@ def test_get_email_summary_with_mock():
             mock_llm_response = MagicMock()
             mock_llm_response.content = "This is a test summary of the quarterly review email."
 
-            with patch('api.llm.invoke', return_value=mock_llm_response):
+            # Mock the chain created by (summary_prompt | llm)
+            with patch('api.summary_prompt') as mock_prompt:
+                mock_chain = MagicMock()
+                mock_chain.invoke.return_value = mock_llm_response
+                mock_prompt.__or__.return_value = mock_chain  # Handle the | operator
+
                 # ACTION: Request summary
                 response = client.get("/emails/0/summary")
 
