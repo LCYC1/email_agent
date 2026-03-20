@@ -14,9 +14,19 @@ import json
 import tempfile
 from pathlib import Path
 import sys
+import os
+import pytest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+api_key = os.getenv("A_API_KEY")
+
+# If no API key, mock the LLM so api.py can import without crashing
+if not api_key:
+    sys.modules['langchain_anthropic'] = MagicMock()
 
 import db
 from fastapi.testclient import TestClient
@@ -203,6 +213,7 @@ def test_get_emails_by_category():
             assert spam[0]["urgency"] == "IGNORE"
 
 
+@pytest.mark.skipif(not api_key, reason="Requires A_API_KEY in .env")
 def test_get_email_summary_with_mock():
     """
     Test GET /emails/{index}/summary generates summary.
@@ -218,7 +229,7 @@ def test_get_email_summary_with_mock():
             mock_llm_response = MagicMock()
             mock_llm_response.content = "This is a test summary of the quarterly review email."
 
-            with patch('api.chain.invoke', return_value=mock_llm_response):
+            with patch('api.llm.invoke', return_value=mock_llm_response):
                 # ACTION: Request summary
                 response = client.get("/emails/0/summary")
 
