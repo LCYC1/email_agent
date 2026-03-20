@@ -9,17 +9,16 @@ An intelligent email classification system powered by Claude AI that automatical
 - **Email Summarization** — Get quick summaries of emails on-demand
 - **Learning System** — Flag emails to provide feedback; the AI learns from your corrections for better future classifications
 - **Web UI** — Clean, responsive interface with filtering, search, and email expansion
-- **No API Billing** — Uses Claude Code Pro subscription, avoiding direct API costs
 
 ## Tech Stack
 
 - **Backend:** Python, FastAPI, LangChain
-- **Frontend:** Vanilla JavaScript, HTML/CSS
+- **Frontend:** JavaScript, HTML/CSS
 - **Database:** SQLite (for learning memory)
 - **AI Model:** Claude Haiku 4.5
 - **Dependency Management:** Poetry
 - **CI/CD:** GitHub Actions
-- **Deployment:** Docker (planned)
+- **Deployment:** Docker
 
 ## Requirements
 
@@ -57,6 +56,7 @@ ACCOUNTS=email1@gmail.com:password1:true,email2@outlook.com:password2:false
 3. Use the 16-character app password in `.env`
 
 ### Outlook/Hotmail Setup
+-Might be difficult to do -> MS Graph API
 1. Enable IMAP in Outlook settings
 2. Use your email password in `.env`
 
@@ -183,14 +183,16 @@ ACCOUNTS=email1@gmail.com:password1:true
 ## Learning Notes
 
 This project demonstrates:
-- **LLM integration** — Using Claude via LangChain
-- **Feedback loops** — Teaching AI from user corrections
-- **Full-stack development** — Python backend + vanilla JS frontend
-- **Email protocols** — IMAP for Gmail and Outlook
-- **Database design** — SQLite for persistent memory
-- **Dependency management** — Poetry for Python projects
-- **CI/CD** — GitHub Actions for automated testing
-- **Clean architecture** — Separation of concerns (fetch, classify, serve, learn)
+**LLM integration** — Using Claude via LangChain for email classification
+**Feedback loops** — Teaching AI from user corrections to improve over time
+**Full-stack development** — Python FastAPI backend + vanilla JS frontend
+**Email protocols** — IMAP for Gmail and Outlook multi-account support
+**Database design** — SQLite for persistent memory of user feedback
+**Dependency management** — Poetry for reproducible Python dependencies
+**CI/CD** — GitHub Actions for automated testing on every push
+**Containerization** — Docker for consistent development/production environments
+**SSH authentication** — Secure git operations without token management
+**Clean architecture** — Separation of concerns (fetch → classify → serve → learn)
 
 ## Future Improvements
 
