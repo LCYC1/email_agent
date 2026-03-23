@@ -9,7 +9,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).parent.parent / "memory.db"
+DB_PATH = Path(__file__).parent.parent / "data" / "memory.db"
 
 
 def init_db():

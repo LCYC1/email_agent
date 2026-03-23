@@ -10,7 +10,7 @@ services:
       - ACCOUNTS=${ACCOUNTS}
       - PORT=${PORT:-8000}
     volumes:
-      - ./memory.db:/app/memory.db
+      - ./data:/app/data
       - ./emails:/app/emails
       - ./logs:/app/logs
     restart: unless-stopped
