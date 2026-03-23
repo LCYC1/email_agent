@@ -1,0 +1,16 @@
+services:
+  api:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      - A_API_KEY=${A_API_KEY}
+      - ACCOUNTS=${ACCOUNTS}
+      - PORT=${PORT:-8000}
+    volumes:
+      - ./data:/app/data
+      - ./emails:/app/emails
+      - ./logs:/app/logs
+    restart: unless-stopped

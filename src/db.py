@@ -9,11 +9,12 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).parent.parent / "memory.db"
+DB_PATH = Path(__file__).parent.parent / "data" / "memory.db"
 
 
 def init_db():
     """Initialize database schema."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
