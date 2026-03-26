@@ -8,6 +8,7 @@ An intelligent email classification system powered by Claude AI that automatical
 - **Multi-Account Support** — Fetch emails from multiple Gmail and Outlook/Hotmail accounts simultaneously
 - **Email Summarization** — Get quick summaries of emails on-demand
 - **Learning System** — Flag emails to provide feedback; the AI learns from your corrections for better future classifications
+- **Dark Mode** — Toggle between light and dark themes with persistent preference
 - **Web UI** — Clean, responsive interface with filtering, search, and email expansion
 
 ## Tech Stack
@@ -17,8 +18,11 @@ An intelligent email classification system powered by Claude AI that automatical
 - **Database:** SQLite (for learning memory)
 - **AI Model:** Claude Haiku 4.5
 - **Dependency Management:** Poetry
+- **Containerization:** Docker (multi-stage build)
+- **Orchestration:** Kubernetes (Google Cloud GKE Autopilot)
 - **CI/CD:** GitHub Actions
-- **Deployment:** Docker
+- **Cloud:** Google Cloud Platform (GCP)
+- **Version Control:** Git, GitHub
 
 ## Requirements
 
@@ -148,7 +152,8 @@ email-agent/
 ├── .gitignore
 ├── .github/
 │   └── workflows/
-│       └── test.yml        # GitHub Actions CI/CD
+│       ├── test.yml        # GitHub Actions testing
+│       └── deploy.yml      # GitHub Actions build & push Docker
 └── README.md
 ```
 
@@ -246,85 +251,138 @@ PORT=8000
 
 ### Kubernetes (Google Cloud GKE)
 
-Deploy to a GKE cluster:
+**Initial Setup:**
 
 ```bash
 # 1. Build and push Docker image to Docker Hub
 docker build -t email-agent:latest .
 docker login
-docker tag email-agent:latest fishsay/email-agent:latest
-docker push fishsay/email-agent:latest
+docker tag email-agent:latest yourusername/email-agent:latest
+docker push yourusername/email-agent:latest
 
-# 2. Get credentials for your GKE cluster
-gcloud container clusters get-credentials agent-cluster --region europe-west1
+# 2. Create GKE cluster (Autopilot recommended for cost efficiency)
+gcloud container clusters create-auto email-agent-cluster --region europe-west1
 
-# 3. Create deployment with environment variables OR use GC console to create cluster (Autopilot for costs) and deploy image from docker hub
-kubectl create deployment email-agent --image=fishsay/email-agent:latest
+# 3. Get credentials for your GKE cluster
+gcloud container clusters get-credentials email-agent-cluster --region europe-west1
+
+# 4. Deploy to Kubernetes
+kubectl create deployment email-agent --image=yourusername/email-agent:latest
 kubectl set env deployment/email-agent \
   ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ACCOUNTS=$ACCOUNTS \
   PORT=8000
 
-# 4. Access locally via port-forward
+# 5. Access locally via port-forward
 kubectl port-forward deployment/email-agent 8000:8000
 # Visit http://localhost:8000
 ```
 
-**Redeploy after code changes:**
+**Production Workflow:**
+
+1. Push code to `develop` branch
+2. Create Pull Request to `main` (requires tests to pass)
+3. Get approval
+4. Merge to `main`
+5. GitHub Actions automatically:
+   - Runs tests
+   - Builds Docker image
+   - Pushes to Docker Hub
+6. Restart K8s deployment to pull new image
+
+**Update K8s with new image:**
 ```bash
-docker build -t email-agent:latest .
-docker tag email-agent:latest fishsay/email-agent:latest
-docker push fishsay/email-agent:latest
 kubectl rollout restart deployment/email-agent -n default
 ```
 
 **Monitor:**
 ```bash
-kubectl get pods              # List running pods
-kubectl logs deployment/email-agent  # View logs
+kubectl get pods                           # List running pods
+kubectl logs deployment/email-agent        # View app logs
+kubectl describe pod <pod-name>            # Get pod details
 ```
+
+**Notes:**
+- Use versioned image tags (`v1.0`, `v1.1`) instead of `latest` to avoid caching issues
+- Default image pull policy `IfNotPresent` caches images locally
+- For automatic pulls on every restart, use `imagePullPolicy: Always`
 
 ### CI/CD (GitHub Actions)
 
-Automated testing, building, and deployment:
+**Setup:**
+
+1. Go to repo → **Settings** → **Secrets and variables** → **Actions**
+2. Add secrets:
+   - `DOCKER_USERNAME` = your Docker Hub username
+   - `DOCKER_PASSWORD` = your Docker Hub password
+
+3. Set up branch protection on `main`:
+   - Go to **Settings** → **Branches**
+   - Add rule for `main`
+   - Require pull request reviews (1 approver)
+   - Require status checks to pass (`Tests` and `Build and Push Docker`)
+
+**Workflow:**
 
 ```bash
-# 1. Set up GitHub secrets
-# Go to: repo → Settings → Secrets and variables → Actions
-# Add secrets:
-#   DOCKER_USERNAME = your Docker Hub username
-#   DOCKER_PASSWORD = your Docker Hub password
+# 1. Create feature branch and commit code
+git checkout -b feature/your-feature
+git commit -m "Your changes"
 
-# 2. Push code to main branch
-git push origin main
+# 2. Push to develop
+git push origin feature/your-feature
 
-# 3. GitHub Actions automatically:
-#   - Runs tests (pytest)
+# 3. Create Pull Request (develop → main)
+# GitHub Actions runs tests automatically
+
+# 4. If tests pass, get approval and merge
+# GitHub Actions automatically:
 #   - Builds Docker image
 #   - Pushes to Docker Hub
-#   - (You manually restart K8s when ready)
+#   - (Ready for K8s deployment)
 ```
 
-**Redeploy to K8s after new image:**
+**Restart K8s after new image:**
 ```bash
 kubectl rollout restart deployment/email-agent -n default
 ```
+
+**Workflows:**
+- `test.yml` — Runs pytest on push/PR
+- `deploy.yml` — Builds and pushes Docker image on merge to main
 
 All support `docker-compose.yml` or direct Docker image deployment.
 
 ## Learning Notes
 
 This project demonstrates:
-**LLM integration** — Using Claude via LangChain for email classification
-**Feedback loops** — Teaching AI from user corrections to improve over time
-**Full-stack development** — Python FastAPI backend + vanilla JS frontend
-**Email protocols** — IMAP for Gmail and Outlook multi-account support
-**Database design** — SQLite for persistent memory of user feedback
-**Dependency management** — Poetry for reproducible Python dependencies
-**CI/CD** — GitHub Actions for automated testing on every push
-**Containerization** — Docker for consistent development/production environments
-**SSH authentication** — Secure git operations without token management
-**Clean architecture** — Separation of concerns (fetch → classify → serve → learn)
+
+**Backend & AI:**
+- **LLM integration** — Using Claude via LangChain for intelligent email classification
+- **Feedback loops** — Teaching AI from user corrections to improve classifications
+- **Database design** — SQLite for persistent memory of user feedback
+- **Clean architecture** — Separation of concerns (fetch → classify → serve → learn)
+
+**Frontend:**
+- **Dark mode** — CSS variables for theme switching with localStorage persistence
+- **Responsive UI** — Vanilla JavaScript with category filtering and email expansion
+- **Real-time updates** — Dynamic rendering without page reloads
+
+**DevOps & Infrastructure:**
+- **Containerization** — Docker multi-stage builds for dev/prod environments
+- **Dependency management** — Poetry for reproducible Python dependencies
+- **Kubernetes orchestration** — GKE deployment with pod management and networking
+- **CI/CD pipelines** — GitHub Actions for automated testing, building, and deployment
+- **Branch protection** — Enforcing PR reviews and status checks before merging
+- **Image caching** — Understanding K8s image pull policies and versioning
+
+**Cloud & Infrastructure Lessons:**
+- Docker authentication and image registry management
+- K8s deployment strategies and troubleshooting
+- GCP Autopilot clusters for cost-efficient cloud hosting
+- GitHub Actions secrets and workflow automation
+- Image caching behavior (`latest` tag limitations vs versioned tags)
+- GitOps principles (Git as source of truth)
 
 ## Future Improvements
 
