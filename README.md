@@ -22,8 +22,9 @@ An intelligent email classification system powered by Claude AI that automatical
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10+ (for local development)
 - Poetry (for dependency management)
+- Docker (for containerized deployment)
 - Gmail/Outlook accounts with IMAP enabled
 - Claude API key (from Anthropic)
 
@@ -75,6 +76,37 @@ python -m uvicorn src.api:app --port 8000
 
 Then open `http://localhost:8000` in your browser.
 
+### Docker (Recommended for production)
+
+**Quick start:**
+```bash
+# Create .env with your credentials
+echo "A_API_KEY=your-anthropic-api-key" > .env
+echo "ACCOUNTS=email@gmail.com:password:true" >> .env
+
+# Run production
+docker compose -f docker-compose.yml up
+
+# Or development with hot reload
+docker compose up
+```
+
+Open `http://localhost:8000` (or your configured PORT).
+
+**Environment variables:**
+```
+A_API_KEY=your-anthropic-api-key
+ACCOUNTS=email@gmail.com:password:true,email2@outlook.com:password2:false
+PORT=8000  (default)
+```
+
+Data persists in `data/`, `emails/`, and `logs/` directories via volume mounts.
+
+**Stop containers:**
+```bash
+docker compose down
+```
+
 ### Fetch and classify emails
 ```bash
 # Fetch emails from configured accounts
@@ -101,11 +133,16 @@ email-agent/
 │   └── test.py             # Basic connectivity test
 ├── static/
 │   └── index.html          # Web UI
+├── data/                   # Runtime data (gitignored)
+│   └── memory.db           # SQLite database
 ├── emails/
-│   └── emails.json         # Fetched emails (runtime)
+│   └── emails.json         # Fetched emails (runtime, gitignored)
 ├── logs/
-│   └── *.log               # Application logs
-├── memory.db               # SQLite database (runtime)
+│   └── *.log               # Application logs (gitignored)
+├── Dockerfile              # Multi-stage build (dev/prod)
+├── docker-compose.yml      # Production compose config
+├── docker-compose.override.yml  # Development overrides (hot reload)
+├── .dockerignore           # Docker ignore rules
 ├── pyproject.toml          # Dependency definitions
 ├── poetry.lock             # Locked dependency versions
 ├── .gitignore
@@ -168,17 +205,112 @@ poetry run pytest -v                 # Verbose output
 
 ## Deployment
 
-### Docker
+### Docker (Recommended)
+
+**Development (with hot reload):**
 ```bash
-docker build -t email-agent .
-docker run -p 8000:8000 --env-file .env email-agent
+docker compose up
+```
+
+**Production (optimized build):**
+```bash
+docker compose -f docker-compose.yml up
+```
+
+**Build and run manually:**
+```bash
+docker build -t email-agent:latest --target prod .
+docker run -p 8000:8000 --env-file .env email-agent:latest
+```
+
+**Push to Docker Hub:**
+```bash
+docker tag email-agent:latest yourusername/email-agent:latest
+docker push yourusername/email-agent:latest
 ```
 
 ### Environment variables
+Create a `.env` file (never commit this):
 ```
 A_API_KEY=your-anthropic-api-key
-ACCOUNTS=email1@gmail.com:password1:true
+ACCOUNTS=email1@gmail.com:password1:true,email2@outlook.com:password2:false
+PORT=8000
 ```
+
+### Cloud Deployment
+- **AWS:** ECS, Fargate, or EC2
+- **Heroku:** Use `docker` buildpack
+- **DigitalOcean:** App Platform (Docker-native)
+- **Azure:** Container Instances or App Service
+- **GCP:** Cloud Run or GKE (Kubernetes)
+
+### Kubernetes (Google Cloud GKE)
+
+Deploy to a GKE cluster:
+
+```bash
+# 1. Build and push Docker image to Docker Hub
+docker build -t email-agent:latest .
+docker login
+docker tag email-agent:latest fishsay/email-agent:latest
+docker push fishsay/email-agent:latest
+
+# 2. Get credentials for your GKE cluster
+gcloud container clusters get-credentials agent-cluster --region europe-west1
+
+# 3. Create deployment with environment variables OR use GC console to create cluster (Autopilot for costs) and deploy image from docker hub
+kubectl create deployment email-agent --image=fishsay/email-agent:latest
+kubectl set env deployment/email-agent \
+  ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ACCOUNTS=$ACCOUNTS \
+  PORT=8000
+
+# 4. Access locally via port-forward
+kubectl port-forward deployment/email-agent 8000:8000
+# Visit http://localhost:8000
+```
+
+**Redeploy after code changes:**
+```bash
+docker build -t email-agent:latest .
+docker tag email-agent:latest fishsay/email-agent:latest
+docker push fishsay/email-agent:latest
+kubectl rollout restart deployment/email-agent -n default
+```
+
+**Monitor:**
+```bash
+kubectl get pods              # List running pods
+kubectl logs deployment/email-agent  # View logs
+```
+
+### CI/CD (GitHub Actions)
+
+Automated testing, building, and deployment:
+
+```bash
+# 1. Set up GitHub secrets
+# Go to: repo → Settings → Secrets and variables → Actions
+# Add secrets:
+#   DOCKER_USERNAME = your Docker Hub username
+#   DOCKER_PASSWORD = your Docker Hub password
+
+# 2. Push code to main branch
+git push origin main
+
+# 3. GitHub Actions automatically:
+#   - Runs tests (pytest)
+#   - Builds Docker image
+#   - Pushes to Docker Hub
+#   - (You manually restart K8s when ready)
+```
+
+**Redeploy to K8s after new image:**
+```bash
+kubectl rollout restart deployment/email-agent -n default
+```
+
+All support `docker-compose.yml` or direct Docker image deployment.
 
 ## Learning Notes
 
