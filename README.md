@@ -242,7 +242,47 @@ PORT=8000
 - **Heroku:** Use `docker` buildpack
 - **DigitalOcean:** App Platform (Docker-native)
 - **Azure:** Container Instances or App Service
-- **GCP:** Cloud Run or GKE
+- **GCP:** Cloud Run or GKE (Kubernetes)
+
+### Kubernetes (Google Cloud GKE)
+
+Deploy to a GKE cluster:
+
+```bash
+# 1. Build and push Docker image to Docker Hub
+docker build -t email-agent:latest .
+docker login
+docker tag email-agent:latest fishsay/email-agent:latest
+docker push fishsay/email-agent:latest
+
+# 2. Get credentials for your GKE cluster
+gcloud container clusters get-credentials agent-cluster --region europe-west1
+
+# 3. Create deployment with environment variables OR use GC console to create cluster (Autopilot for costs) and deploy image from docker hub
+kubectl create deployment email-agent --image=fishsay/email-agent:latest
+kubectl set env deployment/email-agent \
+  ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ACCOUNTS=$ACCOUNTS \
+  PORT=8000
+
+# 4. Access locally via port-forward
+kubectl port-forward deployment/email-agent 8000:8000
+# Visit http://localhost:8000
+```
+
+**Redeploy after code changes:**
+```bash
+docker build -t email-agent:latest .
+docker tag email-agent:latest fishsay/email-agent:latest
+docker push fishsay/email-agent:latest
+kubectl rollout restart deployment/email-agent -n default
+```
+
+**Monitor:**
+```bash
+kubectl get pods              # List running pods
+kubectl logs deployment/email-agent  # View logs
+```
 
 All support `docker-compose.yml` or direct Docker image deployment.
 
