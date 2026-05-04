@@ -57,6 +57,25 @@ jobs:
       with:
         context: .
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/email-agent:latest
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/email-agent:v1.${{ github.run_number }}
+          ${{ secrets.DOCKER_USERNAME }}/email-agent:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/11672584212/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+        service_account: github-actions@project-3af8d800-f8e7-4002-bcb.iam.gserviceaccount.com
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Update K8s deployment
+      run: |
+        gcloud container clusters get-credentials email-agent-cluster --zone europe-west1 --project project-3af8d800-f8e7-4002-bcb
+        kubectl set image deployment/email-agent \
+          email-agent=${{ secrets.DOCKER_USERNAME }}/email-agent:v1.${{ github.run_number }} \
+          -n default
+        kubectl rollout status deployment/email-agent -n default
