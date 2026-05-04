@@ -39,6 +39,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
     - uses: actions/checkout@v4
@@ -63,10 +66,18 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/11672584212/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc-v2
+        service_account: github-actions@project-3af8d800-f8e7-4002-bcb.iam.gserviceaccount.com
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
     - name: Update K8s deployment
       run: |
-        gcloud auth activate-service-account --key-file=${{ secrets.GKE_SA_KEY }}
-        gcloud container clusters get-credentials email-agent-cluster --zone europe-west1 --project ${{ secrets.GCP_PROJECT_ID }}
+        gcloud container clusters get-credentials email-agent-cluster --zone europe-west1 --project project-3af8d800-f8e7-4002-bcb
         kubectl set image deployment/email-agent \
           email-agent=${{ secrets.DOCKER_USERNAME }}/email-agent:v1.${{ github.run_number }} \
           -n default
