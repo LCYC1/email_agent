@@ -39,9 +39,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
     - uses: actions/checkout@v4
@@ -65,6 +62,9 @@ jobs:
           ${{ secrets.DOCKER_USERNAME }}/email-agent:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    - name: Debug OIDC token
+      uses: github/actions-oidc-debugger@main
 
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
